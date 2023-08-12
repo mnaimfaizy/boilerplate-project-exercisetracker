@@ -40,64 +40,7 @@ const Exercise = mongoose.model('Exercise', exerciseSchema);
 app.use(express.json());
 app.use(upload.none()); // Parse FormData
 
-// Route to add a new user
-app.post('/api/users', async (req, res) => {
-  const { username } = req.body;
-  try {
-    const user = new User({ username });
-    await user.save();
-    res.json(user);
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Route to add a new exercise
-app.post('/api/exercise/add', async (req, res) => {
-  const { username, description, duration, date } = req.body;
-  try {
-    const exercise = new Exercise({
-      username,
-      description,
-      duration,
-      date
-    });
-    await exercise.save();
-    res.json(exercise);
-  } catch (error) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Route to get all exercises
-app.get('/api/exercise/all', async (req, res) => {
-  try {
-    const exercises = await Exercise.find();
-    res.json(exercises);
-  } catch (error) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-
-// Route to get user's exercise log
-app.get('/api/users/:_id/logs', async (req, res) => {
-  const userId = req.params._id;
-  const { from, to, limit } = req.query;
-
-  try {
-    const userExercises = await Exercise.find({ username: userId })
-      .where('date').gte(from || '1970-01-01').lte(to || '2100-01-01')
-      .limit(Number(limit) || 0);
-
-    res.json(userExercises);
-  } catch (error) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// Route to add user's exercise
+// Route to add a new user// Route to add user's exercise
 app.post('/api/users/:_id/exercises', async (req, res) => {
   const userId = req.params._id;
   const { description, duration, date } = req.body;
@@ -114,7 +57,52 @@ app.post('/api/users/:_id/exercises', async (req, res) => {
       date: date || new Date()
     });
     await exercise.save();
-    res.json(exercise);
+
+    // Get the user and add exercise data to it
+    const user = await User.findById(userId);
+    user.log.push(exercise);
+    await user.save();
+
+    res.json({
+      _id: user._id,
+      username: user.username,
+      description: exercise.description,
+      duration: exercise.duration,
+      date: exercise.date.toDateString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Route to get user's exercise log
+app.get('/api/users/:_id/logs', async (req, res) => {
+  const userId = req.params._id;
+  const { from, to, limit } = req.query;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.json({ error: 'User not found' });
+    }
+
+    const query = Exercise.find({ username: user.username })
+      .where('date').gte(from || '1970-01-01').lte(to || '2100-01-01')
+      .limit(Number(limit) || 0);
+    const exercises = await query;
+
+    const userLogs = exercises.map(exercise => ({
+      description: exercise.description,
+      duration: exercise.duration,
+      date: exercise.date.toDateString()
+    }));
+
+    res.json({
+      _id: user._id,
+      username: user.username,
+      count: userLogs.length,
+      log: userLogs
+    });
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
   }
