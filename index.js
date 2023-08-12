@@ -5,7 +5,7 @@ const cors = require('cors')
 require('dotenv').config()
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://admin:Kabul123@cluster0.r6amdct.mongodb.net/?retryWrites=true&w=majority', {
+mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });
